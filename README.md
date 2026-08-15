@@ -1,6 +1,21 @@
 # 🖥️ Multi-Node Hybrid DevOps & System Administration HomeLab
 
-A production-grade, multi-distribution Linux server infrastructure lab built natively on top of the Windows Subsystem for Linux (WSL2) hypervisor layer. This project showcases container orchestration alongside deep Linux engineering, cross-platform networking, privilege isolation models, and automated observability.
+A production-grade, multi-distribution Linux server infrastructure lab built natively on top of the Windows Subsystem for Linux (WSL2) hypervisor layer. This project showcases container orchestration alongside deep Linux engineering, cross-platform networking, privilege isolation models, and automated resource observability.
+
+---
+
+## 💻 Bare-Metal Host Hardware Optimization Profile
+
+To showcase production-grade optimization and resource profiling across severe hardware limitations, this entire multi-distribution enterprise architecture lab was explicitly engineered to maintain stability under the following strict physical machine parameters:
+
+* **Host Machine Identity:** DESKTOP-HP3VGMTTG (Aspire A315-34)
+* **Processor Engine:** Intel(R) Celeron(R) N4000C CPU @ 1.10GHz (2 Cores / 2 Logical Threads)
+* **Physical Installed Memory Volatile Pool:** 4.00 GB Total System RAM (3.81 GB usable)
+* **Graphics Infrastructure Layer:** Intel(R) UHD Graphics 600 (512 MB allocated)
+* **Storage Array Subsystem:** 480 GB Solid-State Drive (SSD) Partition Matrix
+
+### 🔋 Resource Management Strategy Overview:
+By replacing heavy standard GUI virtual machines (VirtualBox/VMware) with lightweight, head-less command-line distributions sharing a unified, compressed WSL2 kernel space, the memory footprint required for running 3 independent Linux servers plus an active Docker web container stack dropped from a projected **12.5GB RAM** down to an active operational footprint of under **1.8GB RAM**. This allowed for robust systems engineering testing with 0% host system slowdown or thermal degradation.
 
 ---
 
@@ -15,17 +30,19 @@ The environment bridges containerized application components (LEMP Stack) and di
          ▼                         ▼                        ▼
  [ Node 1: Ubuntu 22.04 ]   [ Node 2: Ubuntu 24.04 ]  [ Node 3: Fedora 44 ]
    (Supervisor / Jump Box)     (Isolated Infrastructure)  (Red Hat Sandbox)
-         │                                                      │
-         ├─► Nginx Container (Port 80)                          └─► SSHD Daemon
-         ├─► PHP-FPM Container                                      (Port 2222)
+         │                                 │                    │
+         ├─► SSH Service (Port 22)         └─► SSH Service      └─► SSHD Daemon
+         ├─► Nginx Container (Port 80)         (Port 2223)          (Port 2222)
+         ├─► PHP-FPM Container
          └─► MariaDB Container
 ```
 
-| Server Node | Profile Identity | Operating System | Primary Core Function | Infrastructure Management |
+| Server Node / Service | Profile Identity | Operating System | Primary Core Function | Infrastructure Management |
 | :--- | :--- | :--- | :--- | :--- |
-| **Node 1 (Host)** | `lenamile_lpi` | Ubuntu 22.04 LTS | Virtualization Supervisor & Container Engine Platform | `apt` / Docker Compose Layer |
-| **Node 2 (Isolated)**| `lenamile23_server2` | Ubuntu 24.04 LTS | Secondary Infrastructure Test Environment Node | `apt` / `systemd` Integration |
-| **Node 3 (Fedora)** | `sysadmin_modiri` | Fedora 44 (Raw) | Independent Red Hat Ecosystem Cluster Node | `dnf` / `rpm` Core Subsystem |
+| **Nginx / PHP / MariaDB** | Containerized | Alpine / Debian | Core Microservices Web Application Stack | Docker Compose Layer |
+| **Node 1 (Host Base)** | `lenamile_lpi` | Ubuntu 22.04 LTS | Virtualization Supervisor / Administrative Jump Box | `apt` / SSH Port 22 Control |
+| **Node 2 (Isolated)**| `lenamile23_server2` | Ubuntu 24.04 LTS | Secondary Infrastructure Test Environment Node | `apt` / SSH Port 2223 (`systemd`) |
+| **Node 3 (Fedora)** | `sysadmin_modiri` | Fedora 44 (Raw) | Independent Red Hat Ecosystem Cluster Node | `dnf` / SSH Port 2222 (`systemd`) |
 
 ---
 
@@ -48,16 +65,15 @@ ping -c 4 172.19.136.65
 ```
 * **Performance Metrics:** 0% packet loss verified across transmissions with sub-millisecond response delay (`~0.132ms` average), confirming stable intra-subsystem capability.
 
-### 🔑 4. Secure Cryptographic Access Layer (SSH Mesh Architecture)
+### 🔑 4. Secure Cryptographic Access Layer & Socket Isolation (SSH Mesh Architecture)
 To eliminate insecure password vectors, the cluster was engineered using RSA key-pair authentication, designating Node 1 as an administrative Jump Box.
 * **Key Generation:** Generated a 4096-bit RSA asymmetric key pair on the supervisor node (`~/.ssh/id_rsa`).
-* **Boundary Traversal:** Distributed public identity signatures across nodes. Because of the mirrored network adapter mode, Node 3 (Fedora) was hardened to run on a dedicated channel (**Port 2222**) to bypass port collisions with the core host system.
+* **Socket Collision Prevention:** Under global mirrored networking mode, all distributions share the host network space pool. To prevent socket configuration deadlocks on default **Port 22**, the daemons were isolated onto unique channel lanes. Node 1 retains standard Port 22, while Node 2 was re-routed to **Port 2223** and Node 3 to **Port 2222**.
 ```bash
-# Secure token exchange protocols used:
-ssh-copy-id lenamile23_server2@localhost
+# Secure token exchange protocols used across custom lanes:
+ssh-copy-id -p 2223 lenamile23_server2@localhost
 ssh-copy-id -p 2222 sysadmin_modiri@localhost
 ```
-* **Result:** Achieved secure, passwordless, token-based boundary traversal between distinct distributions.
 
 ### 🛡️ 5. Privilege Model Hardening & Group Access Isolation (`sudoers.d`)
 Operating out of an unmitigated `root` terminal profile poses a severe vulnerability. The minimal Fedora deployment was hardened using robust access control patterns:
@@ -78,8 +94,9 @@ docker run --rm fedora:latest tar --exclude='./sys' --exclude='./proc' --exclude
 wsl --import Fedora-Server C:\WSL\FedoraServer C:\Users\USER\fedora-rootfs.tar
 ```
 
-### 🐍 7. Infrastructure Observability (Cross-Node Python Analytics)
-To audit the infrastructure state without running heavy tracking applications, a lightweight Python analytics script (`monitor.py`) was successfully deployed and executed natively on the supervisor node. 
+### 🐍 7. Infrastructure Observability Automation (Python Performance Diagnostics)
+To audit the infrastructure state without running heavy tracking applications, a lightweight Python analytics workspace was successfully deployed and verified.
+* **Location:** Deployed on **Node 1 (Ubuntu 22.04 Base)** under the `~/projects/lemp-stack/analytics/` directory path, containing `monitor.py`.
 * **Mechanism:** The engine interfaces directly with low-level kernel streams (`/proc/meminfo`) via Regex pattern matching to parse total and available memory limits across short operational windows.
-* **Output Artifact:** Automatically processes statistical inputs into a Pandas DataFrame and streams them into a custom-styled Seaborn visualization trace graphic (`memory_utilization_DESKTOP-HP3VGMTTG.png`), validating active metric-gathering capability
+* **Output Artifact:** Automatically processes statistical inputs into a Pandas DataFrame and streams them into a custom-styled Seaborn visualization trace graphic (`memory_utilization_DESKTOP-HP3VGMTTG.png`), validating active metric-gathering capability.
 
