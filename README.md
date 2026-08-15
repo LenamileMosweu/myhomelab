@@ -79,5 +79,7 @@ wsl --import Fedora-Server C:\WSL\FedoraServer C:\Users\USER\fedora-rootfs.tar
 ```
 
 ### 🐍 7. Infrastructure Observability (Cross-Node Python Analytics)
-*(We will insert the Python monitor script details and your generated graph analysis notes right here in the next step!)*
+To audit the infrastructure state without running heavy tracking applications, a lightweight Python analytics script (`monitor.py`) was successfully deployed and executed natively on the supervisor node. 
+* **Mechanism:** The engine interfaces directly with low-level kernel streams (`/proc/meminfo`) via Regex pattern matching to parse total and available memory limits across short operational windows.
+* **Output Artifact:** Automatically processes statistical inputs into a Pandas DataFrame and streams them into a custom-styled Seaborn visualization trace graphic (`memory_utilization_DESKTOP-HP3VGMTTG.png`), validating active metric-gathering capability
 
