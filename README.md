@@ -1,102 +1,115 @@
-# 🖥️ Multi-Node Hybrid DevOps & System Administration HomeLab
+# Multi-Node Linux Home Lab (WSL2)
 
-A production-grade, multi-distribution Linux server infrastructure lab built natively on top of the Windows Subsystem for Linux (WSL2) hypervisor layer. This project showcases container orchestration alongside deep Linux engineering, cross-platform networking, privilege isolation models, and automated resource observability.
+A small multi-distro Linux environment I built inside WSL2 to study for LPIC-1 hands-on, after two exam attempts made it clear I needed more practical repetition than reading alone was giving me. It runs three separate Linux servers plus a containerized web stack, all on a low-spec laptop.
 
----
+## Why WSL2 instead of VirtualBox/VMware
 
-## 💻 Bare-Metal Host Hardware Optimization Profile
+My laptop has 4GB RAM (3.8GB usable) and a dual-core Celeron CPU — not enough headroom to run three full GUI-based VMs at once, since each one reserves a fixed chunk of RAM whether it's busy or not. WSL2 distros share a single Linux kernel and only use memory as they need it, so I could run three headless servers plus a Docker stack without the host slowing down noticeably in daily use.
 
-To showcase production-grade optimization and resource profiling across severe hardware limitations, this entire multi-distribution enterprise architecture lab was explicitly engineered to maintain stability under the following strict physical machine parameters:
+> *I haven't formally benchmarked the RAM difference between this setup and full VMs — that's on my list. For now this is a practical description of why I chose this approach, not a measured comparison.*
 
-* **Host Machine Identity:** DESKTOP-HP3VGMTTG (Aspire A315-34)
-* **Processor Engine:** Intel(R) Celeron(R) N4000C CPU @ 1.10GHz (2 Cores / 2 Logical Threads)
-* **Physical Installed Memory Volatile Pool:** 4.00 GB Total System RAM (3.81 GB usable)
-* **Graphics Infrastructure Layer:** Intel(R) UHD Graphics 600 (512 MB allocated)
-* **Storage Array Subsystem:** 480 GB Solid-State Drive (SSD) Partition Matrix
+**Host machine:**
+- DESKTOP-HP3VGMTTG (Acer Aspire A315-34)
+- Intel Celeron N4000C @ 1.10GHz, 2 cores / 2 threads
+- 4.00 GB RAM (3.81 GB usable)
+- Intel UHD Graphics 600 (512MB)
+- ~480GB SSD
 
-### 🔋 Resource Management Strategy Overview:
-By replacing heavy standard GUI virtual machines (VirtualBox/VMware) with lightweight, head-less command-line distributions sharing a unified, compressed WSL2 kernel space, the memory footprint required for running 3 independent Linux servers plus an active Docker web container stack dropped from a projected **12.5GB RAM** down to an active operational footprint of under **1.8GB RAM**. This allowed for robust systems engineering testing with 0% host system slowdown or thermal degradation.
+## Layout
 
----
-
-## 🏗️ Integrated Cluster Architecture Design
-
-The environment bridges containerized application components (LEMP Stack) and distinct standalone enterprise Linux nodes communicating on a shared subsystem space.
-
-```text
-       [ Windows 11 Physical Host (Mirrored Network Space Pool) ]
-                                   │
-         ┌─────────────────────────┼────────────────────────┐
-         ▼                         ▼                        ▼
- [ Node 1: Ubuntu 22.04 ]   [ Node 2: Ubuntu 24.04 ]  [ Node 3: Fedora 44 ]
-   (Supervisor / Jump Box)     (Isolated Infrastructure)  (Red Hat Sandbox)
-         │                                 │                    │
-         ├─► SSH Service (Port 22)         └─► SSH Service      └─► SSHD Daemon
-         ├─► Nginx Container (Port 80)         (Port 2223)          (Port 2222)
-         ├─► PHP-FPM Container
-         └─► MariaDB Container
+```
+        [ Windows 11 Host — WSL2, networkingMode=mirrored ]
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+[ Node 1: Ubuntu 22.04 ] [ Node 2: Ubuntu 24.04 ] [ Node 3: Fedora 44 ]
+  jump box / supervisor      test environment       Red Hat–family sandbox
+        │                         │                       │
+        ├─ SSH (port 22)         └─ SSH (port 2223)       └─ SSH (port 2222)
+        ├─ Nginx (Docker)
+        ├─ PHP-FPM (Docker)
+        └─ MariaDB (Docker)
 ```
 
-| Server Node / Service | Profile Identity | Operating System | Primary Core Function | Infrastructure Management |
-| :--- | :--- | :--- | :--- | :--- |
-| **Nginx / PHP / MariaDB** | Containerized | Alpine / Debian | Core Microservices Web Application Stack | Docker Compose Layer |
-| **Node 1 (Host Base)** | `lenamile_lpi` | Ubuntu 22.04 LTS | Virtualization Supervisor / Administrative Jump Box | `apt` / SSH Port 22 Control |
-| **Node 2 (Isolated)**| `lenamile23_server2` | Ubuntu 24.04 LTS | Secondary Infrastructure Test Environment Node | `apt` / SSH Port 2223 (`systemd`) |
-| **Node 3 (Fedora)** | `sysadmin_modiri` | Fedora 44 (Raw) | Independent Red Hat Ecosystem Cluster Node | `dnf` / SSH Port 2222 (`systemd`) |
+| Node | User | OS | What it's for | Package tool |
+|---|---|---|---|---|
+| Node 1 | `lenamile_lpi` | Ubuntu 22.04 LTS | Main box, jump host to the others | apt |
+| Node 2 | `lenamile23_server2` | Ubuntu 24.04 LTS | Separate test environment | apt |
+| Node 3 | `sysadmin_modiri` | Fedora 44 | Red Hat–family practice (dnf/rpm instead of apt/dpkg) | dnf |
+| Web stack | — | Alpine/Debian containers | Nginx + PHP-FPM + MariaDB | Docker Compose |
 
----
+## What's in here
 
-## 🛠️ Core Sysadmin Engineering Implementations
+### 1. LEMP stack in Docker
+Nginx reverse-proxies requests to PHP-FPM, which talks to a separate MariaDB container. Each service is its own container managed with Docker Compose, so I could break and rebuild individual pieces without taking down the whole stack — useful for practicing troubleshooting one layer at a time.
 
-### 1. 🐳 Containerized Web Application Stack (LEMP Engine)
-* **Orchestration:** Implemented a microservices architecture using Docker Compose managing isolated runtimes.
-* **Stack Layout:** Reverse-proxy routing handles external transactions via **Nginx**, parsing programmatic operations execution flags cleanly down through independent **PHP-FPM** containers while preserving data frames within segregated stateful **MariaDB** engine layers.
+### 2. Mirrored networking
+By default, WSL2 distros sit behind NAT and aren't reachable the way a real LAN device would be. I set `networkingMode=mirrored` in `%USERPROFILE%\.wslconfig` so each distro shares the host's actual network interface. That let me test reachability, firewall rules, and inter-node connectivity closer to how it would work on real separate machines.
 
-### 2. 🌐 Advanced Subsystem Networking (Mirrored Mode)
-By default, WSL distribution nodes sit behind an isolated internal virtual switch using Network Address Translation (NAT). To establish a realistic local environment, the default hypervisor architecture was completely overridden at the host layer:
-* **Implementation:** Configured a global configuration utility at `%USERPROFILE%\.wslconfig` enforcing `networkingMode=mirrored`.
-* **Result:** All standalone Linux instances mirror the host's physical hardware network interfaces, enabling integrated DNS tunneling and native firewall packet filtering.
+```powershell
+# %USERPROFILE%\.wslconfig
+[wsl2]
+networkingMode=mirrored
+```
 
-### 📡 3. Network Connectivity & Latency Metrics (`ping`)
-Inter-node network paths and loopback routing accuracy were audited from the supervisor control center.
-```bash
-# Auditing the network response path from Node 1 to Node 2 & 3
+Verified connectivity between nodes with a basic ping test:
+
+```
 ping -c 4 172.19.136.65
+# 4 packets transmitted, 4 received, 0% packet loss
 ```
-* **Performance Metrics:** 0% packet loss verified across transmissions with sub-millisecond response delay (`~0.132ms` average), confirming stable intra-subsystem capability.
 
-### 🔑 4. Secure Cryptographic Access Layer & Socket Isolation (SSH Mesh Architecture)
-To eliminate insecure password vectors, the cluster was engineered using RSA key-pair authentication, designating Node 1 as an administrative Jump Box.
-* **Key Generation:** Generated a 4096-bit RSA asymmetric key pair on the supervisor node (`~/.ssh/id_rsa`).
-* **Socket Collision Prevention:** Under global mirrored networking mode, all distributions share the host network space pool. To prevent socket configuration deadlocks on default **Port 22**, the daemons were isolated onto unique channel lanes. Node 1 retains standard Port 22, while Node 2 was re-routed to **Port 2223** and Node 3 to **Port 2222**.
+### 3. SSH key-based access across nodes
+Password auth is off; each node uses key-based SSH. Node 1 acts as the jump box I work from, connecting out to Nodes 2 and 3.
+
+Since mirrored networking means all three distros share one IP space, I put each node's SSH daemon on its own port to avoid conflicts: Node 1 on the default port 22, Node 2 on 2223, Node 3 on 2222.
+
 ```bash
-# Secure token exchange protocols used across custom lanes:
+# generate a 4096-bit key pair on Node 1
+ssh-keygen -t rsa -b 4096
+
+# copy the public key to the other nodes
 ssh-copy-id -p 2223 lenamile23_server2@localhost
 ssh-copy-id -p 2222 sysadmin_modiri@localhost
 ```
 
-### 🛡️ 5. Privilege Model Hardening & Group Access Isolation (`sudoers.d`)
-Operating out of an unmitigated `root` terminal profile poses a severe vulnerability. The minimal Fedora deployment was hardened using robust access control patterns:
-* Provisioned an unprivileged workspace identity (`sysadmin_modiri`) containing individual home file spaces.
-* Patched the administrative permission pool without breaking the main server settings file by injecting a locked file configuration directly into the isolated `sudoers.d` framework:
+### 4. Least-privilege access on Fedora
+Rather than working as root on Node 3, I created a standard user (`sysadmin_modiri`) and granted sudo access through a dedicated file in `/etc/sudoers.d/` instead of editing `/etc/sudoers` directly — this keeps the change isolated and easy to remove without risking the main sudoers file.
+
 ```bash
 echo "sysadmin_modiri ALL=(ALL) ALL" > /etc/sudoers.d/sysadmin_modiri
 chmod 0440 /etc/sudoers.d/sysadmin_modiri
 ```
 
-### 💾 6. OS Image Stripping, Extraction, and Registration
-Bypassed standard app stores and operating system catalog installers by stripping an active container down to its core file system structure and manually registering it:
-```powershell
-# Stripping live runtime memory layers and streaming an OS root footprint directly to disk
-docker run --rm fedora:latest tar --exclude='./sys' --exclude='./proc' --exclude='./dev' --exclude='./run' -cf - . > C:\Users\USER\fedora-rootfs.tar
+### 5. Building a WSL image from a Docker container
+Wanted a Fedora WSL distro but there was no official WSL image, so I built one from the official Docker image instead: exported a running Fedora container's filesystem to a tarball, then imported that tarball as a new WSL distro.
 
-# Low-level manual registration of the extracted image asset into the WSL cluster
-wsl --import Fedora-Server C:\WSL\FedoraServer C:\Users\USER\fedora-rootfs.tar
+```bash
+docker run --rm fedora:latest tar --exclude='./sys' --exclude='./proc' \
+  --exclude='./dev' --exclude='./run' -cf - . > fedora-rootfs.tar
+
+wsl --import Fedora-Server C:\WSL\FedoraServer fedora-rootfs.tar
 ```
 
-### 🐍 7. Infrastructure Observability Automation (Python Performance Diagnostics)
-To audit the infrastructure state without running heavy tracking applications, a lightweight Python analytics workspace was successfully deployed and verified.
-* **Location:** Deployed on **Node 1 (Ubuntu 22.04 Base)** under the `~/projects/lemp-stack/analytics/` directory path, containing `monitor.py`.
-* **Mechanism:** The engine interfaces directly with low-level kernel streams (`/proc/meminfo`) via Regex pattern matching to parse total and available memory limits across short operational windows.
-* **Output Artifact:** Automatically processes statistical inputs into a Pandas DataFrame and streams them into a custom-styled Seaborn visualization trace graphic (`memory_utilization_DESKTOP-HP3VGMTTG.png`), validating active metric-gathering capability.
+### 6. Memory usage script (Python)
+A small script on Node 1 (`~/projects/lemp-stack/analytics/monitor.py`) that reads `/proc/meminfo` directly, parses total/available memory over a sampling window, and plots it with Pandas + Seaborn — mostly to have a real, working example of scripting against a live system file rather than a static dataset.
 
+Output: `memory_utilization_DESKTOP-HP3VGMTTG.png`
+
+## LPIC-1 coverage so far
+
+This lab and the accompanying 16-week study log cover **Exam 101** material:
+
+- Topic 101 — System Architecture
+- Topic 102 — Linux Installation & Package Management
+- Topic 103 — GNU & Unix Commands
+- Topic 104 — Devices, Filesystems, FHS
+
+**Exam 102** (105–110: shell scripting, user interfaces, admin tasks, essential services, networking fundamentals, security) is the next phase — the SSH and sudoers work above already touches Topics 109 and 110, so the next round of labs will build those out properly and document them the same way.
+
+## What I'd still like to add
+
+- Actual `free -h` / `htop` output comparing this setup to a baseline, instead of an estimated number
+- A basic cron job + log rotation example (Topic 107/108)
+- A simple shell script with error handling (Topic 105)
+- A short write-up per lab: what broke, how I diagnosed it, how I fixed it
